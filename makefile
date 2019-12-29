@@ -13,7 +13,7 @@ hl-convert-snd: hl-convert-snd.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $^ -lFLAC++
 
 hl-convert-ggs: hl-convert-ggs.cpp
-	$(CXX) $(CXXFLAGS) -o $@ $^
+	$(CXX) $(CXXFLAGS) -o $@ $^ -lpng
 
 clean:
 	-rm -f hl-extract hl-convert-snd hl-convert-ggs

@@ -6,6 +6,8 @@ This repository contains utilities to extract the sound and graphics assets from
 
 * g++
 * libFLAC++
+* png++
+* libpng
 
 ### Usage
 

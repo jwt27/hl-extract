@@ -7,6 +7,11 @@
 #include <array>
 #include <filesystem>
 
+#define __STDC_LIB_EXT1__ 1
+#include <png++/png.hpp>
+
+#include "palette.h"
+
 namespace fs = std::filesystem;
 using byte = std::uint8_t;
 
@@ -26,6 +31,21 @@ union image_chunk
     };
 };
 
+hl_palette pal { };
+
+void encode(fs::path p, std::vector<byte> image, png::uint_32 w, png::uint_32 h)
+{
+    png::image<png::index_pixel> png { w, h };
+    png.set_palette(pal.color);
+    png.set_tRNS(pal.alpha);
+
+    for (unsigned y = 0; y < h; ++y)
+        for (unsigned x = 0; x < w; ++x)
+            png[y][x] = image[x + y * w];
+
+    png.write(p.string());
+}
+
 int main()
 {
     bool separate = false;
@@ -35,7 +55,7 @@ int main()
     {
         auto p = dir_entry.path().filename();
         if (p.extension() != ".ggs") continue;
-        
+
         std::cout << "Converting " << p.string() << "...";
 
         std::ifstream in { p, std::ios::binary | std::ios::ate };
@@ -44,14 +64,14 @@ int main()
 
         std::vector<std::vector<byte>> images;
         images.resize(0x40);
-        
+
         for (unsigned count = 0; in.good() and count < 0x40; ++count)
         {
             auto& image = images[count];
             image.resize(24 * 24, 0xff);
-            
+
             if (in.get() == 0xff) continue;
-            
+
             image_chunk chunk;
             in.read(chunk.bytes.data(), 0x2b0);
 
@@ -61,23 +81,22 @@ int main()
                 if (a != 0xff) a = chunk.vga_lookup[a];
                 image[i] = a;
             }
-            
+
             if (separate)
             {
                 auto p2 = p;
                 p2.replace_extension("");
                 std::stringstream s { };
-                s << "-" << std::setfill('0') << std::setw(2) << count << ".raw";
+                s << "-" << std::setfill('0') << std::setw(2) << count << ".png";
                 p2 += s.str();
-                std::ofstream out { outdir / p2, std::ios::binary };
-                out.write(reinterpret_cast<char*>(image.data()), image.size());
+                encode(outdir / p2, image, 24, 24);
             }
         }
         if (not separate)
         {
             std::vector<byte> image;
             image.resize(8 * 8 * 24 * 24, 0xff);
-            
+
             for (unsigned y = 0; y < 8 * 24; ++y)
             {
                 for (unsigned x = 0; x < 8 * 24; ++x)
@@ -88,11 +107,10 @@ int main()
                     image[x + y * 24 * 8] = src[x2 + y2 * 24];
                 }
             }
-            
+
             auto p2 = p;
-            p2.replace_extension(".raw");
-            std::ofstream out { outdir / p2, std::ios::binary };
-            out.write(reinterpret_cast<char*>(image.data()), image.size());
+            p2.replace_extension(".png");
+            encode(outdir / p2, image, 8 * 24, 8 * 24);
         }
         std::cout << "\n";
     }
