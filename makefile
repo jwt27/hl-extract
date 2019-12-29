@@ -4,16 +4,16 @@ CXXFLAGS += -Wall -Wextra
 
 .PHONY: all clean
 
-all: hl-extract hl-convert-audio hl-convert-ggs
+all: hl-extract hl-convert-snd hl-convert-ggs
 
 hl-extract: hl-extract.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-hl-convert-audio: hl-convert-audio.cpp
+hl-convert-snd: hl-convert-snd.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $^ -lFLAC++
 
 hl-convert-ggs: hl-convert-ggs.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 clean:
-	-rm -f hl-extract hl-convert-audio hl-convert-ggs
+	-rm -f hl-extract hl-convert-snd hl-convert-ggs
