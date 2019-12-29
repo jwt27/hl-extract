@@ -31,17 +31,21 @@ union image_chunk
     };
 };
 
-hl_palette pal { };
+const hl_palette pal { };
+const png::uint_32 size_mult = 4;
 
 void encode(fs::path p, std::vector<byte> image, png::uint_32 w, png::uint_32 h)
 {
-    png::image<png::index_pixel> png { w, h };
+    png::image<png::index_pixel> png { w * size_mult, h * size_mult };
     png.set_palette(pal.color);
     png.set_tRNS(pal.alpha);
 
+    const auto m = size_mult;
     for (unsigned y = 0; y < h; ++y)
         for (unsigned x = 0; x < w; ++x)
-            png[y][x] = image[x + y * w];
+            for (unsigned ym = 0; ym < m; ++ym)
+                for (unsigned xm = 0; xm < m; ++xm)
+                    png[y * m + ym][x * m + xm] = image[x + y * w];
 
     png.write(p.string());
 }
