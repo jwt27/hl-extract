@@ -6,6 +6,8 @@
 #include <vector>
 #include <array>
 #include <filesystem>
+#include <string_view>
+#include <charconv>
 
 #define __STDC_LIB_EXT1__ 1
 #include <png++/png.hpp>
@@ -32,7 +34,7 @@ union image_chunk
 };
 
 const hl_palette pal { };
-const png::uint_32 size_mult = 4;
+png::uint_32 size_mult = 4;
 
 void encode(fs::path p, std::vector<byte> image, png::uint_32 w, png::uint_32 h)
 {
@@ -50,10 +52,56 @@ void encode(fs::path p, std::vector<byte> image, png::uint_32 w, png::uint_32 h)
     png.write(p.string());
 }
 
-int main()
+int main(int argc, char** argv)
 {
     bool separate = false;
-    const auto outdir = fs::path { "converted" };
+    auto outdir = fs::path { "converted" };
+
+    for (int i = 1; i < argc; ++i)
+    {
+        std::string_view arg { argv[i] };
+        auto param = [&arg] (std::string_view prefix)
+        {
+            if (arg.starts_with(prefix))
+            {
+                arg.remove_prefix(prefix.size());
+                return true;
+            }
+            return false;
+        };
+
+        if (param("--separate")) separate = true;
+        else if (param("--outdir=")) outdir = arg;
+        else if (param("--size-mult="))
+        {
+            int m;
+            auto result = std::from_chars(arg.data(), arg.data() + arg.size(), m);
+            if (result.ec != std::errc { } or m < 1 or m > 100)
+            {
+                std::cerr << "Invalid multiplier: " << arg << "\n";
+                return 1;
+            }
+            size_mult = m;
+        }
+        else if (param("--help") or param("-?"))
+        {
+            auto self = fs::path(argv[0]).filename().string();
+            std::cout << "Usage: " << self << " [options]\n"
+                      << "Convert all .ggs files in the current directory to .png.\n\n"
+                      << "Available options:\n"
+                      << "      --separate      Write each 24x24 sprite to a separate file.\n"
+                      << "      --size-mult=N   Multiply image size by N. (default: 4)\n"
+                      << "      --outdir=DIR    Write extracted files to DIR. (default: \"converted\")\n"
+                      << "  -?, --help          Show this message.\n";
+            return 0;
+        }
+        else
+        {
+            std::cerr << "Unknown option: " << arg << "\n";
+            return 1;
+        }
+    }
+
     fs::create_directory(outdir);
     for (auto& dir_entry : fs::directory_iterator("."))
     {
@@ -88,12 +136,12 @@ int main()
 
             if (separate)
             {
-                auto p2 = p;
+                auto p2 = outdir / p;
                 p2.replace_extension("");
                 std::stringstream s { };
                 s << "-" << std::setfill('0') << std::setw(2) << count << ".png";
                 p2 += s.str();
-                encode(outdir / p2, image, 24, 24);
+                encode(p2, image, 24, 24);
             }
         }
         if (not separate)
@@ -112,9 +160,9 @@ int main()
                 }
             }
 
-            auto p2 = p;
+            auto p2 = outdir / p;
             p2.replace_extension(".png");
-            encode(outdir / p2, image, 8 * 24, 8 * 24);
+            encode(p2, image, 8 * 24, 8 * 24);
         }
         std::cout << "\n";
     }
