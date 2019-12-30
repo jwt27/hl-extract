@@ -1,5 +1,5 @@
 CXX := g++
-CXXFLAGS += -O3 -flto -std=gnu++17
+CXXFLAGS += -O3 -flto -std=gnu++2a
 CXXFLAGS += -Wall -Wextra
 
 .PHONY: all clean

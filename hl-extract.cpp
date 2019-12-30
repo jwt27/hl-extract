@@ -9,6 +9,7 @@
 #include <array>
 #include <algorithm>
 #include <filesystem>
+#include <string_view>
 
 using byte = std::uint8_t;
 
@@ -71,16 +72,16 @@ void decompress(I src, O dst, const file_entry& f)
             *dst++ = *(src - 1);
             continue;
         }
-        
+
         byte lo = *src++;
         byte hi = *src++;
-        
+
         if ((lo | hi) == 0)
         {
             *dst++ = f.magic;
             continue;
         }
-        
+
         std::size_t count = hi >> 2;
         std::size_t offset = ((hi << 8) | lo) & 0x3ff;
         auto clone_src = dst - offset - 1;
@@ -89,13 +90,48 @@ void decompress(I src, O dst, const file_entry& f)
     }
 }
 
-int main()
+int main(int argc, char** argv)
 {
     namespace fs = std::filesystem;
-    
-    if (not fs::is_regular_file("HL.EXE")) throw std::runtime_error { "HL.EXE not found." };
-    
-    std::ifstream in { "HL.EXE", std::ios::binary | std::ios::in };
+
+    auto infile = fs::path { "HL.EXE" };
+    auto outdir = fs::path{ "extracted" };
+
+    for (int i = 1; i < argc; ++i)
+    {
+        std::string_view arg { argv[i] };
+        auto param = [&arg] (std::string_view prefix)
+        {
+            if (arg.starts_with(prefix))
+            {
+                arg.remove_prefix(prefix.size());
+                return true;
+            }
+            return false;
+        };
+
+        if (param("--infile=")) infile = arg;
+        else if (param("--outdir=")) outdir = arg;
+        else if (param("--help") or param("-?"))
+        {
+            auto self = fs::path(argv[0]).filename().string();
+            std::cout << "Usage: " << self << " [options]\n"
+                      << "Extract graphics and sound assets from the Heartlight executable.\n\n"
+                      << "Available options:\n"
+                      << "      --infile=FILE   Extract data from FILE. (default: \"HL.EXE\")\n"
+                      << "      --outdir=DIR    Write extracted files to DIR. (default: \"extracted\")\n"
+                      << "  -?, --help          Show this message.\n";
+            return 0;
+        }
+        else
+        {
+            std::cerr << "Unknown option: " << arg << "\n";
+            return 1;
+        }
+    }
+
+    if (not fs::is_regular_file(infile)) throw std::runtime_error { "Input file not found." };
+    std::ifstream in { infile, std::ios::binary | std::ios::in };
     in.exceptions(std::ios::badbit | std::ios::failbit);
 
     std::vector<file_entry> files;
@@ -123,9 +159,8 @@ int main()
         data_offset = static_cast<std::size_t>(in.tellg()) - vp.data_offset;
         std::cout << "Found " << vp.num_files << " file entries.\n";
     }
-    
-    auto dir = fs::path{"extracted"};
-    fs::create_directory(dir);
+
+    fs::create_directory(outdir);
     for (auto& f : files)
     {
         std::cout << "Extracting " << f.name << ", ";
@@ -133,26 +168,27 @@ int main()
         if (f.compressed) std::cout << " (" << std::setw(5) << f.compressed_size << " compressed)";
         else std::cout << " (  not compressed)";
         std::cout << ", offset: 0x" << std::hex << (data_offset + f.offset) << ".\n";
-        
+
         in.seekg(data_offset + f.offset, std::ios::beg);
-        
+
         std::vector<char> compressed_data, data;
         compressed_data.resize(f.compressed_size);
         in.read(compressed_data.data(), f.compressed_size);
         decode(compressed_data.begin(), f.compressed_size);
         char* p = compressed_data.data();
-        
+
         if (f.compressed)
         {
             data.resize(f.size);
             decompress(compressed_data.cbegin(), data.begin(), f);
             p = data.data();
         }
-        
-        auto file = dir / f.name;
+
+        auto file = outdir / f.name;
         fs::remove(file);
         std::ofstream out { file , std::ios::binary | std::ios::out | std::ios::trunc };
         out.exceptions(std::ios::badbit | std::ios::failbit);
         out.write(p, f.size);
     }
+    return 0;
 }
