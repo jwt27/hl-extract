@@ -5,6 +5,8 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include <string_view>
+#include <charconv>
 #include <FLAC++/encoder.h>
 
 namespace fs = std::filesystem;
@@ -45,10 +47,54 @@ void encode(std::string file, std::vector<char> in)
     std::cout << "\n";
 }
 
-int main()
+int main(int argc, char** argv)
 {
+    auto outdir = fs::path { "converted" };
+
+    for (int i = 1; i < argc; ++i)
+    {
+        std::string_view arg { argv[i] };
+        auto param = [&arg] (std::string_view prefix)
+        {
+            if (arg.starts_with(prefix))
+            {
+                arg.remove_prefix(prefix.size());
+                return true;
+            }
+            return false;
+        };
+
+        if (param("--outdir=")) outdir = arg;
+        else if (param("--sample-mult="))
+        {
+            int m;
+            auto result = std::from_chars(arg.data(), arg.data() + arg.size(), m);
+            if (result.ec != std::errc { } or m < 1 or m > 100)
+            {
+                std::cerr << "Invalid multiplier: " << arg << "\n";
+                return 1;
+            }
+            sample_mult = m;
+        }
+        else if (param("--help") or param("-?"))
+        {
+            auto self = fs::path(argv[0]).filename().string();
+            std::cout << "Usage: " << self << " [options]\n"
+                      << "Convert all .snd files in the current directory to .flac.\n\n"
+                      << "Available options:\n"
+                      << "      --sample-mult=N Multiply sample rate by N. (default: 6)\n"
+                      << "      --outdir=DIR    Write extracted files to DIR. (default: \"converted\")\n"
+                      << "  -?, --help          Show this message.\n";
+            return 0;
+        }
+        else
+        {
+            std::cerr << "Unknown option: " << arg << "\n";
+            return 1;
+        }
+    }
+
     std::unordered_map<std::string, std::vector<char>> waves { };
-    const auto outdir = fs::path { "converted" };
     fs::create_directory(outdir);
     for (auto& dir_entry : fs::directory_iterator("."))
     {
