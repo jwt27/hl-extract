@@ -1,6 +1,6 @@
 ## hl-extract
 
-This repository contains utilities to extract the sound and graphics assets from the game [Heartlight](https://en.wikipedia.org/wiki/Heartlight_(video_game)), and convert these files to readable formats.
+This repository contains utilities to extract the sound and graphics assets from the game [Heartlight](https://www.mobygames.com/game/dos/heartlight), and convert these files to readable formats.
 
 ### Prerequisites
 
